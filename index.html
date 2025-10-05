@@ -126,8 +126,24 @@
                 const WORKFLOW_ENDPOINT = 'https://serverless.roboflow.com/infer/workflows/nut-detection-cn8ep/custom-workflow-3';
                 const API_KEY = 'W3JaMDUJgegvylcX7n4Y';
 
+                console.log('Starting image processing...');
+                
                 // Convert image to base64
                 const base64 = await fileToBase64(selectedFile);
+                console.log('Image converted to base64, length:', base64.length);
+
+                // Prepare request payload
+                const payload = {
+                    api_key: API_KEY,
+                    inputs: {
+                        image: {
+                            type: 'base64',
+                            value: base64
+                        }
+                    }
+                };
+                
+                console.log('Sending request to Roboflow...');
 
                 // Call Roboflow workflow
                 const response = await fetch(WORKFLOW_ENDPOINT, {
@@ -135,42 +151,74 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        api_key: API_KEY,
-                        inputs: {
-                            image: {
-                                type: 'base64',
-                                value: base64
-                            }
-                        }
-                    })
+                    body: JSON.stringify(payload)
                 });
 
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
 
                 const result = await response.json();
-                console.log('Workflow response:', result);
+                console.log('✅ Full Workflow Response:');
+                console.log(JSON.stringify(result, null, 2));
 
                 // Extract detections data
                 let detectionsData = [];
+                let visualizationBase64 = null;
+
                 if (result.outputs && Array.isArray(result.outputs)) {
-                    result.outputs.forEach(output => {
+                    console.log('Number of outputs:', result.outputs.length);
+                    
+                    result.outputs.forEach((output, idx) => {
+                        console.log(`\nOutput ${idx} keys:`, Object.keys(output));
+                        
+                        // Look for visualization in multiple possible locations
+                        if (output.visualization) {
+                            console.log('Found visualization in output.visualization');
+                            visualizationBase64 = typeof output.visualization === 'string' 
+                                ? output.visualization 
+                                : output.visualization.value;
+                        } else if (output.image) {
+                            console.log('Found visualization in output.image');
+                            visualizationBase64 = typeof output.image === 'string' 
+                                ? output.image 
+                                : output.image.value;
+                        } else if (output.output_image) {
+                            console.log('Found visualization in output.output_image');
+                            visualizationBase64 = typeof output.output_image === 'string' 
+                                ? output.output_image 
+                                : output.output_image.value;
+                        }
+                        
+                        // Extract predictions
                         if (output.predictions && Array.isArray(output.predictions)) {
+                            console.log(`Found ${output.predictions.length} predictions in output ${idx}`);
                             detectionsData = output.predictions.map(pred => ({
                                 class: pred.class || 'Unknown',
                                 confidence: pred.confidence || 0,
-                                output_label: output.output_label || 'Detection'
+                                output_label: output.output_label || output.name || 'Detection'
                             }));
                         }
                     });
                 }
 
+                console.log('Detections found:', detectionsData.length);
+                console.log('Visualization base64 length:', visualizationBase64 ? visualizationBase64.length : 'null');
+
                 // Display results
-                if (result.outputs && result.outputs[0] && result.outputs[0].visualization) {
-                    const visualizationBase64 = result.outputs[0].visualization.value;
-                    document.getElementById('resultImage').src = `data:image/jpeg;base64,${visualizationBase64}`;
+                if (visualizationBase64) {
+                    console.log('✅ Displaying visualization');
+                    // Check if base64 already has data URI prefix
+                    const imgSrc = visualizationBase64.startsWith('data:') 
+                        ? visualizationBase64 
+                        : `data:image/jpeg;base64,${visualizationBase64}`;
+                    
+                    document.getElementById('resultImage').src = imgSrc;
                     document.getElementById('resultSection').classList.remove('hidden');
 
                     // Display detection details
@@ -178,11 +226,13 @@
                         displayDetections(detectionsData);
                     }
                 } else {
-                    throw new Error('No visualization found in response');
+                    console.error('❌ Could not find visualization in response');
+                    console.error('Available output keys:', result.outputs ? result.outputs.map(o => Object.keys(o)) : 'none');
+                    throw new Error('No visualization found. Please check console for full response structure.');
                 }
 
             } catch (error) {
-                console.error('Error processing image:', error);
+                console.error('❌ Error processing image:', error);
                 document.getElementById('errorMessage').textContent = error.message;
                 document.getElementById('errorSection').classList.remove('hidden');
             } finally {
