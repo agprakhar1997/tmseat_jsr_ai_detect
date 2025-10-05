@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TM Seating Seat Detection System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loader {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #9333ea;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+    <div class="max-w-6xl mx-auto p-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">
+                TM Seating Seat Detection System
+            </h1>
+        </div>
+
+        <!-- Main Card -->
+        <div class="bg-white rounded-3xl shadow-lg p-10">
+            <!-- Upload Section -->
+            <div class="mb-10">
+                <label for="imageUpload" class="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-gray-200 rounded-2xl cursor-pointer hover:border-purple-400 hover:bg-purple-50/50 transition-all">
+                    <svg class="w-14 h-14 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    <p class="text-sm text-gray-600 font-medium">Click to upload</p>
+                    <input id="imageUpload" type="file" class="hidden" accept="image/*" onchange="handleImageSelect(event)">
+                </label>
+            </div>
+
+            <!-- Preview Section -->
+            <div id="previewSection" class="mb-10 hidden">
+                <img id="previewImage" src="" alt="Preview" class="w-full rounded-2xl mb-6">
+                <button onclick="processImage()" id="detectButton" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-4 rounded-xl transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <span id="buttonText">Detect Seats</span>
+                </button>
+            </div>
+
+            <!-- Loading -->
+            <div id="loadingSection" class="mb-10 hidden">
+                <div class="flex items-center justify-center p-12">
+                    <div class="loader"></div>
+                    <span class="ml-3 text-gray-500">Processing...</span>
+                </div>
+            </div>
+
+            <!-- Error Section -->
+            <div id="errorSection" class="mb-10 p-5 bg-red-50 border border-red-100 rounded-xl hidden">
+                <p class="text-sm text-red-700"><span id="errorMessage"></span></p>
+            </div>
+
+            <!-- Result Section -->
+            <div id="resultSection" class="hidden">
+                <img id="resultImage" src="" alt="Detection Result" class="w-full rounded-2xl mb-8">
+                
+                <!-- Detection Details -->
+                <div id="detectionsContainer" class="hidden">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-medium text-gray-700">Detections</h3>
+                        <span class="text-sm text-gray-500"><span id="detectionCount">0</span> found</span>
+                    </div>
+                    <div id="detectionCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Cards will be inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            <div id="instructionsSection" class="bg-purple-50/70 border border-purple-100 rounded-xl p-6">
+                <h3 class="font-medium text-purple-900 mb-3">Ready to detect seats</h3>
+                <ul class="text-sm text-purple-700 space-y-2">
+                    <li>• Upload an image with seats</li>
+                    <li>• Get instant detection results</li>
+                    <li>• View confidence scores</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        function handleImageSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFile = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('previewImage').src = e.target.result;
+                    document.getElementById('previewSection').classList.remove('hidden');
+                    document.getElementById('instructionsSection').classList.add('hidden');
+                    document.getElementById('resultSection').classList.add('hidden');
+                    document.getElementById('errorSection').classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function processImage() {
+            if (!selectedFile) return;
+
+            // Show loading
+            document.getElementById('loadingSection').classList.remove('hidden');
+            document.getElementById('detectButton').disabled = true;
+            document.getElementById('errorSection').classList.add('hidden');
+            document.getElementById('resultSection').classList.add('hidden');
+
+            try {
+                const WORKFLOW_ENDPOINT = 'https://serverless.roboflow.com/infer/workflows/nut-detection-cn8ep/custom-workflow-3';
+                const API_KEY = 'W3JaMDUJgegvylcX7n4Y';
+
+                // Convert image to base64
+                const base64 = await fileToBase64(selectedFile);
+
+                // Call Roboflow workflow
+                const response = await fetch(WORKFLOW_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        api_key: API_KEY,
+                        inputs: {
+                            image: {
+                                type: 'base64',
+                                value: base64
+                            }
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('Workflow response:', result);
+
+                // Extract detections data
+                let detectionsData = [];
+                if (result.outputs && Array.isArray(result.outputs)) {
+                    result.outputs.forEach(output => {
+                        if (output.predictions && Array.isArray(output.predictions)) {
+                            detectionsData = output.predictions.map(pred => ({
+                                class: pred.class || 'Unknown',
+                                confidence: pred.confidence || 0,
+                                output_label: output.output_label || 'Detection'
+                            }));
+                        }
+                    });
+                }
+
+                // Display results
+                if (result.outputs && result.outputs[0] && result.outputs[0].visualization) {
+                    const visualizationBase64 = result.outputs[0].visualization.value;
+                    document.getElementById('resultImage').src = `data:image/jpeg;base64,${visualizationBase64}`;
+                    document.getElementById('resultSection').classList.remove('hidden');
+
+                    // Display detection details
+                    if (detectionsData.length > 0) {
+                        displayDetections(detectionsData);
+                    }
+                } else {
+                    throw new Error('No visualization found in response');
+                }
+
+            } catch (error) {
+                console.error('Error processing image:', error);
+                document.getElementById('errorMessage').textContent = error.message;
+                document.getElementById('errorSection').classList.remove('hidden');
+            } finally {
+                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('detectButton').disabled = false;
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => {
+                    const base64 = reader.result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+            });
+        }
+
+        function displayDetections(detections) {
+            const container = document.getElementById('detectionCards');
+            const countElement = document.getElementById('detectionCount');
+            
+            countElement.textContent = detections.length;
+            container.innerHTML = '';
+
+            detections.forEach((detection, index) => {
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-gray-200 rounded-xl p-5 hover:border-purple-300 hover:shadow-sm transition-all';
+                
+                const confidence = (detection.confidence * 100).toFixed(1);
+                
+                card.innerHTML = `
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <div class="text-sm font-medium text-gray-900 mb-1">${detection.class}</div>
+                            <div class="text-xs text-purple-600">${detection.output_label}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-semibold text-gray-900">${confidence}%</div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="bg-gradient-to-r from-purple-500 to-blue-500 h-full transition-all" style="width: ${confidence}%"></div>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+
+            document.getElementById('detectionsContainer').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
