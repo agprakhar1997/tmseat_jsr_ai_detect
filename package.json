@@ -1,6 +1,7 @@
 {
   "name": "roboflow-vercel-processor",
   "version": "1.0.0",
+  "type": "module",
   "serverless": {
     "maxDuration": 30,
     "bodySizeLimit": "50mb"
