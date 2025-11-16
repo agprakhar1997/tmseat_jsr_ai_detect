@@ -2,9 +2,10 @@
 // It handles API keys and logic that should not be exposed to the public browser.
 
 // --- ENVIRONMENT VARIABLES AND CONSTANTS ---
-// NOTE: In a real Vercel project, the API Key must be set up 
-// under Settings -> Environment Variables.
-const ROBOFLOW_API_KEY = process.env.ROBOFLOW_API_KEY || 'YOUR_ROBOFLOW_API_KEY';
+// CRITICAL FIX: Directly reading the environment variable. 
+// This relies entirely on the key being set in the Vercel dashboard.
+const ROBOFLOW_API_KEY = process.env.ROBOFLOW_API_KEY; 
+
 // The full Roboflow Workflow URL from the user's curl command
 const ROBOFLOW_WORKFLOW_URL = 'https://serverless.roboflow.com/nut-detection-cn8ep/workflows/detect-count-and-visualize';
 // The user-provided Google Sheet ID
@@ -12,11 +13,14 @@ const GOOGLE_SHEET_ID = '1Y2C45lC-GzasdChXONHywO9d9t3pQxOaqSMdJaDNJNc';
 
 // Function to call the Roboflow Workflow API (or mock it if in development)
 async function runRoboflowInference(base64Image, fileName) {
-    const isMock = ROBOFLOW_API_KEY.includes('YOUR');
+    // If ROBOFLOW_API_KEY is null, undefined, or empty, we treat it as missing 
+    // and rely on the next check to throw the appropriate error.
+    const isKeyMissing = !ROBOFLOW_API_KEY || ROBOFLOW_API_KEY.length === 0;
 
-    if (isMock) {
-        // --- MOCK ROBOTFLOW WORKFLOW RESPONSE FOR TESTING ---
-        console.log("MOCK MODE: Simulating Roboflow response for testing.");
+    if (isKeyMissing) {
+        // Since we removed the placeholder, if the key is missing, we must mock the response
+        // to prevent an immediate crash, but we'll flag it as an issue.
+        console.warn("MOCK MODE: ROBOFLOW_API_KEY is not set in Vercel environment. Simulating response.");
         await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API delay
         
         // Simulating the result from a detection step in a workflow (nut counting)
@@ -25,7 +29,7 @@ async function runRoboflowInference(base64Image, fileName) {
                 { label: 'walnut', confidence: 0.97 },
                 { label: 'almond', confidence: 0.91 },
                 { label: 'walnut', confidence: 0.95 },
-                { label: 'pistachio', confidence: 0.85 } // Include another label for variety
+                { label: 'pistachio', confidence: 0.85 }
             ],
             workflow_step: 'object_detection',
             image_dimensions: '1024x768'
@@ -56,13 +60,11 @@ async function runRoboflowInference(base64Image, fileName) {
         const data = await response.json();
 
         if (!response.ok) {
-            // Handle HTTP error statuses from the Roboflow server
+            // Roboflow API returns "Unauthorized api_key" if key is wrong
             console.error("Roboflow API returned error:", data);
-            // Throw a specific error to be caught by the main handler
             throw new Error(data.message || 'Roboflow API call failed with bad response.');
         }
 
-        // Return the full workflow response data
         return data;
 
     } catch (error) {
@@ -76,7 +78,6 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
     console.log(`Appending results to Google Sheet ID: ${sheetId}`);
 
     // Assuming the workflow output contains predictions in a 'predictions' array
-    // This allows us to parse the results before sending them to the sheet.
     const predictions = roboflowResults.predictions || roboflowResults.detections || [];
 
     // Count specific labels (updated for nut detection)
@@ -92,9 +93,6 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
         almondCount,               // D: Almond Count
         totalDetections            // E: Total Detected
     ];
-
-    // NOTE: In a real app, you would integrate the 'googleapis' library here
-    // to securely authorize and append the 'dataRow' to the sheet.
 
     // --- MOCK GOOGLE SHEET SUCCESS ---
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
@@ -114,12 +112,12 @@ export default async function handler(req, res) {
     }
 
     // Log which mode we are running in for debugging
-    const isMock = ROBOFLOW_API_KEY.includes('YOUR');
-    if (isMock) {
-        console.warn("VERCEL LOG: Using placeholder key. Running in MOCK mode (NO REAL API CALL).");
+    const isKeyMissing = !ROBOFLOW_API_KEY;
+    if (isKeyMissing) {
+        console.warn("VERCEL LOG: Key is missing. Running in MOCK mode.");
     } else {
         const maskedKey = ROBOFLOW_API_KEY.substring(0, 4) + '...';
-        console.log(`VERCEL LOG: Using real API key starting with ${maskedKey}. Attempting Roboflow API call.`);
+        console.log(`VERCEL LOG: Key is present. Starting with ${maskedKey}.`);
     }
 
     try {
