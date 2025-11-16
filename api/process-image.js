@@ -113,11 +113,13 @@ export default async function handler(req, res) {
         return res.status(405).json({ message: `Method ${req.method} not allowed` });
     }
 
-    // Check for required API key (critical for production)
-    if (ROBOFLOW_API_KEY.includes('YOUR')) {
-        // Allow mock mode to run even if the placeholder is present
-        // But send a warning if it's not the placeholder, or if the mock failed.
-        console.warn("Using placeholder API key. Running in MOCK mode.");
+    // Log which mode we are running in for debugging
+    const isMock = ROBOFLOW_API_KEY.includes('YOUR');
+    if (isMock) {
+        console.warn("VERCEL LOG: Using placeholder key. Running in MOCK mode (NO REAL API CALL).");
+    } else {
+        const maskedKey = ROBOFLOW_API_KEY.substring(0, 4) + '...';
+        console.log(`VERCEL LOG: Using real API key starting with ${maskedKey}. Attempting Roboflow API call.`);
     }
 
     try {
