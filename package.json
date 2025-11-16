@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "serverless": {
     "maxDuration": 30,
-    "bodySizeLimit": "10mb"
+    "bodySizeLimit": "50mb"
   }
 }
