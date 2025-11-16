@@ -1,17 +1,29 @@
-<!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TM Seating Seat Detection System</title>
+    <title>Roboflow Workflow Processor</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .loader {
-            border: 3px solid #f3f4f6;
-            border-top: 3px solid #9333ea;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
+        /* Custom styles for aesthetic enhancements */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+        .card {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .btn-primary {
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(66, 153, 225, 0.5), 0 2px 4px -2px rgba(66, 153, 225, 0.5);
+        }
+        .loading-spinner {
+            border-top-color: #3b82f6;
             animation: spin 1s linear infinite;
         }
         @keyframes spin {
@@ -20,271 +32,174 @@
         }
     </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
-    <div class="max-w-6xl mx-auto p-8">
-        <!-- Header -->
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-gray-800 mb-2">
-                TM Seating Seat Detection System
-            </h1>
-        </div>
+<body class="flex items-center justify-center min-h-screen p-4">
 
-        <!-- Main Card -->
-        <div class="bg-white rounded-3xl shadow-lg p-10">
-            <!-- Upload Section -->
-            <div class="mb-10">
-                <label for="imageUpload" class="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-gray-200 rounded-2xl cursor-pointer hover:border-purple-400 hover:bg-purple-50/50 transition-all">
-                    <svg class="w-14 h-14 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                    </svg>
-                    <p class="text-sm text-gray-600 font-medium">Click to upload</p>
-                    <input id="imageUpload" type="file" class="hidden" accept="image/*" onchange="handleImageSelect(event)">
-                </label>
-            </div>
+    <div id="app" class="card bg-white p-8 rounded-xl w-full max-w-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Roboflow Data Processor</h1>
+        <p class="text-center text-sm text-gray-500 mb-8">
+            Select an image to send to the Roboflow Workflow for inference. Results will be saved to your Google Sheet via a secure backend.
+        </p>
 
-            <!-- Preview Section -->
-            <div id="previewSection" class="mb-10 hidden">
-                <img id="previewImage" src="" alt="Preview" class="w-full rounded-2xl mb-6">
-                <button onclick="processImage()" id="detectButton" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-4 rounded-xl transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                    <span id="buttonText">Detect Seats</span>
-                </button>
-            </div>
-
-            <!-- Loading -->
-            <div id="loadingSection" class="mb-10 hidden">
-                <div class="flex items-center justify-center p-12">
-                    <div class="loader"></div>
-                    <span class="ml-3 text-gray-500">Processing...</span>
-                </div>
-            </div>
-
-            <!-- Error Section -->
-            <div id="errorSection" class="mb-10 p-5 bg-red-50 border border-red-100 rounded-xl hidden">
-                <p class="text-sm text-red-700"><span id="errorMessage"></span></p>
-            </div>
-
-            <!-- Result Section -->
-            <div id="resultSection" class="hidden">
-                <img id="resultImage" src="" alt="Detection Result" class="w-full rounded-2xl mb-8">
-                
-                <!-- Detection Details -->
-                <div id="detectionsContainer" class="hidden">
-                    <div class="flex items-center justify-between mb-6">
-                        <h3 class="text-lg font-medium text-gray-700">Detections</h3>
-                        <span class="text-sm text-gray-500"><span id="detectionCount">0</span> found</span>
-                    </div>
-                    <div id="detectionCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <!-- Cards will be inserted here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Instructions -->
-            <div id="instructionsSection" class="bg-purple-50/70 border border-purple-100 rounded-xl p-6">
-                <h3 class="font-medium text-purple-900 mb-3">Ready to detect seats</h3>
-                <ul class="text-sm text-purple-700 space-y-2">
-                    <li>• Upload an image with seats</li>
-                    <li>• Get instant detection results</li>
-                    <li>• View confidence scores</li>
-                </ul>
+        <!-- Image Input and Preview -->
+        <div class="mb-6">
+            <label for="imageUpload" class="block text-sm font-medium text-gray-700 mb-2">Upload Image</label>
+            <input type="file" id="imageUpload" accept="image/*" class="w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-blue-50 file:text-blue-700
+                hover:file:bg-blue-100 cursor-pointer
+            ">
+            <div class="mt-4 border border-gray-300 rounded-lg h-48 flex items-center justify-center bg-gray-50 overflow-hidden">
+                <img id="imagePreview" class="max-h-full max-w-full object-contain" src="https://placehold.co/400x192/E0E7FF/3B82F6?text=Image+Preview" alt="Image preview">
             </div>
         </div>
+
+        <!-- Action Button -->
+        <button id="processButton" onclick="processImage()"
+            class="btn-primary w-full py-3 px-4 text-white font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition duration-150 ease-in-out flex items-center justify-center"
+        >
+            <span id="buttonText">Process Image & Update Sheet</span>
+            <div id="loadingSpinner" class="hidden loading-spinner w-5 h-5 border-2 border-transparent rounded-full ml-3"></div>
+        </button>
+
+        <!-- Status Message -->
+        <div id="statusMessage" class="mt-6 p-3 rounded-lg text-sm text-center hidden"></div>
+
+        <!-- Results Display -->
+        <div id="resultsDisplay" class="mt-6 p-4 border border-gray-200 rounded-lg hidden">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">Inference Results</h3>
+            <div class="space-y-1 text-gray-600">
+                <p><strong>Walnuts Detected:</strong> <span id="walnutCount" class="font-bold text-blue-600">0</span></p>
+                <p><strong>Almonds Detected:</strong> <span id="almondCount" class="font-bold text-blue-600">0</span></p>
+                <p><strong>Total Items:</strong> <span id="totalCount" class="font-bold text-blue-600">0</span></p>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        let selectedFile = null;
+        const imageUpload = document.getElementById('imageUpload');
+        const imagePreview = document.getElementById('imagePreview');
+        const processButton = document.getElementById('processButton');
+        const buttonText = document.getElementById('buttonText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const statusMessage = document.getElementById('statusMessage');
+        const resultsDisplay = document.getElementById('resultsDisplay');
+        const walnutCountEl = document.getElementById('walnutCount');
+        const almondCountEl = document.getElementById('almondCount');
+        const totalCountEl = document.getElementById('totalCount');
 
-        function handleImageSelect(event) {
+        // Event listener for file selection to update the preview
+        imageUpload.addEventListener('change', function(event) {
             const file = event.target.files[0];
             if (file) {
-                selectedFile = file;
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    document.getElementById('previewImage').src = e.target.result;
-                    document.getElementById('previewSection').classList.remove('hidden');
-                    document.getElementById('instructionsSection').classList.add('hidden');
-                    document.getElementById('resultSection').classList.add('hidden');
-                    document.getElementById('errorSection').classList.add('hidden');
+                    imagePreview.src = e.target.result;
+                    imagePreview.alt = file.name;
+                    statusMessage.classList.add('hidden');
+                    resultsDisplay.classList.add('hidden'); // Clear previous results
                 };
                 reader.readAsDataURL(file);
             }
+        });
+
+        // Function to display a status message
+        function showStatus(message, isError = false) {
+            statusMessage.textContent = message;
+            statusMessage.className = 'mt-6 p-3 rounded-lg text-sm text-center';
+            if (isError) {
+                statusMessage.classList.add('bg-red-100', 'text-red-700');
+            } else {
+                statusMessage.classList.add('bg-green-100', 'text-green-700');
+            }
+            statusMessage.classList.remove('hidden');
         }
 
+        // Function to display the counts from the backend
+        function displayResults(dataRow) {
+            // Data row is: [Timestamp, FileName, WalnutCount, AlmondCount, TotalCount]
+            const [, , walnutCount, almondCount, totalCount] = dataRow;
+
+            walnutCountEl.textContent = walnutCount;
+            almondCountEl.textContent = almondCount;
+            totalCountEl.textContent = totalCount;
+            resultsDisplay.classList.remove('hidden');
+        }
+
+        // Main function to trigger the processing workflow
         async function processImage() {
-            if (!selectedFile) return;
+            const file = imageUpload.files[0];
+            if (!file) {
+                showStatus('Please select an image file first.', true);
+                return;
+            }
 
-            // Show loading
-            document.getElementById('loadingSection').classList.remove('hidden');
-            document.getElementById('detectButton').disabled = true;
-            document.getElementById('errorSection').classList.add('hidden');
-            document.getElementById('resultSection').classList.add('hidden');
+            // 1. Prepare UI for loading
+            processButton.disabled = true;
+            buttonText.textContent = 'Processing...';
+            loadingSpinner.classList.remove('hidden');
+            statusMessage.classList.add('hidden');
+            resultsDisplay.classList.add('hidden');
 
-            try {
-                const WORKFLOW_ENDPOINT = 'https://serverless.roboflow.com/infer/workflows/nut-detection-cn8ep/custom-workflow-3';
-                const API_KEY = 'W3JaMDUJgegvylcX7n4Y';
+            // 2. Read file as an ArrayBuffer
+            const reader = new FileReader();
+            reader.readAsArrayBuffer(file);
 
-                console.log('Starting image processing...');
+            reader.onloadend = async function() {
+                // Convert ArrayBuffer to a Base64 string for safe JSON transmission
+                const base64Image = arrayBufferToBase64(reader.result);
+
+                // IMPORTANT: This is the secure call to your serverless backend
+                const backendEndpoint = '/api/process-image'; 
                 
-                // Convert image to base64
-                const base64 = await fileToBase64(selectedFile);
-                console.log('Image converted to base64, length:', base64.length);
-
-                // Prepare request payload
-                const payload = {
-                    api_key: API_KEY,
-                    inputs: {
-                        image: {
-                            type: 'base64',
-                            value: base64
-                        }
-                    }
-                };
-                
-                console.log('Sending request to Roboflow...');
-
-                // Call Roboflow workflow
-                const response = await fetch(WORKFLOW_ENDPOINT, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Error response:', errorText);
-                    throw new Error(`HTTP ${response.status}: ${errorText}`);
-                }
-
-                const result = await response.json();
-                console.log('✅ Full Workflow Response:');
-                console.log(JSON.stringify(result, null, 2));
-
-                // Extract detections data
-                let detectionsData = [];
-                let visualizationBase64 = null;
-
-                if (result.outputs && Array.isArray(result.outputs)) {
-                    console.log('Number of outputs:', result.outputs.length);
-                    
-                    result.outputs.forEach((output, idx) => {
-                        console.log(`\nOutput ${idx} keys:`, Object.keys(output));
-                        
-                        // Look for visualization in multiple possible locations
-                        if (output.visualization) {
-                            console.log('Found visualization in output.visualization');
-                            visualizationBase64 = typeof output.visualization === 'string' 
-                                ? output.visualization 
-                                : output.visualization.value;
-                        } else if (output.image) {
-                            console.log('Found visualization in output.image');
-                            visualizationBase64 = typeof output.image === 'string' 
-                                ? output.image 
-                                : output.image.value;
-                        } else if (output.output_image) {
-                            console.log('Found visualization in output.output_image');
-                            visualizationBase64 = typeof output.output_image === 'string' 
-                                ? output.output_image 
-                                : output.output_image.value;
-                        }
-                        
-                        // Extract predictions
-                        if (output.predictions && Array.isArray(output.predictions)) {
-                            console.log(`Found ${output.predictions.length} predictions in output ${idx}`);
-                            detectionsData = output.predictions.map(pred => ({
-                                class: pred.class || 'Unknown',
-                                confidence: pred.confidence || 0,
-                                output_label: output.output_label || output.name || 'Detection'
-                            }));
-                        }
+                try {
+                    const response = await fetch(backendEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        // Send the image and file metadata to the secure backend
+                        body: JSON.stringify({
+                            image: base64Image,
+                            fileName: file.name,
+                            mimeType: file.type
+                        })
                     });
-                }
 
-                console.log('Detections found:', detectionsData.length);
-                console.log('Visualization base64 length:', visualizationBase64 ? visualizationBase64.length : 'null');
-
-                // Display results
-                if (visualizationBase64) {
-                    console.log('✅ Displaying visualization');
-                    // Check if base64 already has data URI prefix
-                    const imgSrc = visualizationBase64.startsWith('data:') 
-                        ? visualizationBase64 
-                        : `data:image/jpeg;base64,${visualizationBase64}`;
-                    
-                    document.getElementById('resultImage').src = imgSrc;
-                    document.getElementById('resultSection').classList.remove('hidden');
-
-                    // Display detection details
-                    if (detectionsData.length > 0) {
-                        displayDetections(detectionsData);
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || `Backend processing failed with status ${response.status}`);
                     }
-                } else {
-                    console.error('❌ Could not find visualization in response');
-                    console.error('Available output keys:', result.outputs ? result.outputs.map(o => Object.keys(o)) : 'none');
-                    throw new Error('No visualization found. Please check console for full response structure.');
-                }
 
-            } catch (error) {
-                console.error('❌ Error processing image:', error);
-                document.getElementById('errorMessage').textContent = error.message;
-                document.getElementById('errorSection').classList.remove('hidden');
-            } finally {
-                document.getElementById('loadingSection').classList.add('hidden');
-                document.getElementById('detectButton').disabled = false;
+                    const result = await response.json();
+                    
+                    // Display success and the response from the backend
+                    showStatus(`Success! Roboflow processed the image. Sheet update status: ${result.sheetStatus || 'Completed'}.`, false);
+                    displayResults(result.results); // Display the counts!
+
+                } catch (error) {
+                    console.error('Processing error:', error);
+                    showStatus(`An error occurred: ${error.message}`, true);
+                } finally {
+                    // 3. Reset UI
+                    processButton.disabled = false;
+                    buttonText.textContent = 'Process Image & Update Sheet';
+                    loadingSpinner.classList.add('hidden');
+                }
             }
         }
 
-        function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => {
-                    const base64 = reader.result.split(',')[1];
-                    resolve(base64);
-                };
-                reader.onerror = reject;
-            });
-        }
-
-        function displayDetections(detections) {
-            const container = document.getElementById('detectionCards');
-            const countElement = document.getElementById('detectionCount');
-            
-            countElement.textContent = detections.length;
-            container.innerHTML = '';
-
-            detections.forEach((detection, index) => {
-                const card = document.createElement('div');
-                card.className = 'bg-white border border-gray-200 rounded-xl p-5 hover:border-purple-300 hover:shadow-sm transition-all';
-                
-                const confidence = (detection.confidence * 100).toFixed(1);
-                
-                card.innerHTML = `
-                    <div class="flex items-start justify-between mb-4">
-                        <div>
-                            <div class="text-sm font-medium text-gray-900 mb-1">${detection.class}</div>
-                            <div class="text-xs text-purple-600">${detection.output_label}</div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-sm font-semibold text-gray-900">${confidence}%</div>
-                        </div>
-                    </div>
-                    <div class="bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-gradient-to-r from-purple-500 to-blue-500 h-full transition-all" style="width: ${confidence}%"></div>
-                    </div>
-                `;
-                
-                container.appendChild(card);
-            });
-
-            document.getElementById('detectionsContainer').classList.remove('hidden');
+        // Helper function to convert ArrayBuffer to Base64
+        function arrayBufferToBase64(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            const len = bytes.byteLength;
+            for (let i = 0; i < len; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
         }
     </script>
 </body>
