@@ -36,9 +36,11 @@
 
     <div id="app" class="card bg-white p-8 rounded-xl w-full max-w-lg">
         <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Roboflow Data Processor</h1>
-        <p class="text-center text-sm text-gray-500 mb-8">
+        <p class="text-center text-sm text-gray-500 mb-2">
             Select an image to send to the Roboflow Workflow for inference. The image will be automatically resized for reliable processing.
         </p>
+        
+        <!-- The Mock Mode warning has been removed -->
 
         <!-- Image Input and Preview -->
         <div class="mb-6">
@@ -234,8 +236,8 @@
                 // SUCCESS path: Now safely parse the pre-read responseText as JSON
                 const result = JSON.parse(responseText);
                 
-                // Display success and the response from the backend
-                showStatus(`Success! Image resized and processed. Sheet update status: ${result.sheetStatus || 'Completed'}.`, false);
+                // UPDATED CLARIFICATION: Update success message to be clear about the sheet status received from the backend
+                showStatus(`Success! Image processed. Sheet update status: ${result.sheetStatus || 'Check Vercel Logs'}.`, false);
                 displayResults(result.results); // Display the counts!
 
             } catch (error) {
