@@ -3,10 +3,13 @@
 // structure for Google Sheets integration.
 
 // --- EXTERNAL DEPENDENCY REQUIRED FOR GOOGLE SHEETS ---
-import { GoogleSpreadsheet } from 'google-spreadsheet';
+// FIX: Using 'import * as' ensures we capture the GoogleSpreadsheet class correctly 
+// in Vercel's ES Module environment, resolving the 'not a function' error.
+import * as GoogleSheets from 'google-spreadsheet';
 
 // --- CONSTANTS & CONFIGURATION ---
 const ROBOFLOW_API_KEY = process.env.ROBOFLOW_API_KEY; 
+// --- UPDATED SHEET ID ---
 const GOOGLE_SHEET_ID = '1-nYFSaufidji9l3OKfYeiyumQbGdmh5waFBbXapxMKc'; 
 const ROBOFLOW_WORKFLOW_URL = 'https://serverless.roboflow.com/nut-detection-cn8ep/workflows/detect-count-and-visualize'; 
 const CREDENTIALS_JSON = process.env.GOOGLE_CREDENTIALS_JSON;
@@ -102,7 +105,8 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
     try {
         // 1. Parse credentials and setup:
         const creds = JSON.parse(CREDENTIALS_JSON);
-        const doc = new GoogleSpreadsheet(sheetId); 
+        // Using the correctly imported class from the GoogleSheets module
+        const doc = new GoogleSheets.GoogleSpreadsheet(sheetId); 
         
         // 2. Authenticate:
         await doc.useServiceAccountAuth(creds);
