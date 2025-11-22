@@ -110,6 +110,7 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
         const sheet = doc.sheetsByIndex[0]; 
 
         // 3. Write data:
+        // NOTE: Column headers MUST match the sheet headers exactly (Timestamp, File Name, Walnut Count, etc.)
         await sheet.addRow({
             'Timestamp': dataRow[0],
             'File Name': dataRow[1],
@@ -122,6 +123,7 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
 
     } catch (error) {
         console.error('GOOGLE SHEETS API ERROR:', error.message);
+        // This usually indicates an issue with the Service Account email not having 'Editor' access
         sheetStatus = `Failed to Write: ${error.message.substring(0, 50)}...`;
     }
     
@@ -136,6 +138,7 @@ export default async function handler(req, res) {
         return res.status(405).json({ message: `Method ${req.method} not allowed` });
     }
 
+    // This is the correct log message for the final, real implementation
     console.warn("VERCEL LOG: Running in REAL Roboflow mode and REAL Sheet write mode.");
 
     try {
