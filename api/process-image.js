@@ -44,18 +44,22 @@ async function runRoboflowInference(base64Image, fileName) {
         // Fallback to mock data with all 22 classes
         await new Promise(resolve => setTimeout(resolve, 1500)); 
         
-        // Generate mock predictions to ensure all 22 classes are tested
-        const mockPredictions = [
-            { label: 'belt_buckle', confidence: 0.97 },
-            { label: 'finising_okay', confidence: 0.95 },
-            { label: 'scratch_marks', confidence: 0.88 },
-            { label: 'belt_buckle', confidence: 0.99 },
-            { label: 'towel_bar', confidence: 0.92 }
+        // Mocking the *EXACT* nested structure provided by the user for testing reliability
+        return [
+            {
+                "count_objects": 4,
+                "output_image": { "type": "base64", "value": "mock_base64_image_data" },
+                "predictions": {
+                    "image": { "width": 1536, "height": 2048 },
+                    "predictions": [
+                        { "class": "bitline_gap_not_available", "confidence": 0.78 },
+                        { "class": "side_cover", "confidence": 0.78 },
+                        { "class": "belt_buckle", "confidence": 0.76 },
+                        { "class": "feature_line_not_okay", "confidence": 0.50 }
+                    ]
+                }
+            }
         ];
-
-        return {
-            predictions: mockPredictions,
-        };
     }
 
     console.log(`REAL MODE: Sending image ${fileName} to Roboflow workflow.`);
@@ -84,28 +88,32 @@ async function runRoboflowInference(base64Image, fileName) {
             throw new Error(data.message || 'Roboflow API call failed with bad response.');
         }
 
-        // Add a check to ensure 'predictions' array exists before returning
-        if (!data.predictions) {
-            console.warn("Roboflow response successful but missing 'predictions' key. Response:", data);
+        // Roboflow workflow returns the results nested within an array
+        if (!Array.isArray(data) || data.length === 0) {
+            console.warn("Roboflow response successful but is not in the expected workflow array format.", data);
         }
         
-        return data;
-
+        return data; // Return the full API response array
     } catch (error) {
         throw new Error(`Roboflow inference failed: ${error.message}`);
     }
 }
 
 /**
- * [REAL LOGIC STRUCTURE] Securely prepares the data and appends it to the Google Sheet 
+ * Securely prepares the data and appends it to the Google Sheet 
  * using the official Google API library.
  */
 async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
     console.log(`SHEET LOGIC: Attempting to write data to ID: ${sheetId}`);
     
     // --- START: COUNTING LOGIC (Uses REAL or MOCK Roboflow results) ---
-    const predictions = roboflowResults.predictions || roboflowResults.detections || [];
     
+    // CRITICAL FIX: Safely access the deeply nested 'predictions' array 
+    // that is returned by the Roboflow Workflow API
+    const predictions = roboflowResults?.[0]?.predictions?.predictions || [];
+    
+    console.log(`Successfully extracted ${predictions.length} detections from Roboflow response.`);
+
     // Map to store counts for each target class
     const classCounts = {};
     let totalDetections = 0;
@@ -117,7 +125,8 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
 
     // Count detections
     predictions.forEach(d => {
-        const label = d.label;
+        // Roboflow detections use 'class' key, not 'label'
+        const label = d.class || d.label; 
         if (TARGET_CLASSES.includes(label)) {
             classCounts[label]++;
         }
@@ -201,7 +210,7 @@ export default async function handler(req, res) {
         const { image: base64Image, fileName } = req.body;
         
         if (!base64Image) {
-            return res.status(400).json({ message: "No image data provided." });
+            return res.status(400).json({ message: "No image data provided in request body." });
         }
 
         // 1. Run Roboflow Inference (REAL)
