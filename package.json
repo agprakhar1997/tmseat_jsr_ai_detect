@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "google-spreadsheet": "^4.1.0"
+    "googleapis": "^128.0.0"
   },
   "serverless": {
     "maxDuration": 30,
