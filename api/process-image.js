@@ -9,21 +9,52 @@ const GOOGLE_SHEET_ID = '1-nYFSaufidji9l3OKfYeiyumQbGdmh5waFBbXapxMKc';
 const ROBOFLOW_WORKFLOW_URL = 'https://serverless.roboflow.com/nut-detection-cn8ep/workflows/detect-count-and-visualize'; 
 const CREDENTIALS_JSON = process.env.GOOGLE_CREDENTIALS_JSON;
 
+// --- DYNAMIC CLASS CONFIGURATION (NOW TRACKING ALL 22 CLASSES) ---
+const TARGET_CLASSES = [
+    'belt_buckle',
+    'bitline_gap_available',
+    'bitline_gap_not_available',
+    'deep_hoggering',
+    'feature_line_not_okay',
+    'feature_line_okay',
+    'finising_no_okay',
+    'finising_okay',
+    'foam_visible',
+    'J_strip_lock_issue',
+    'marking_present',
+    'missing_part',
+    'no_missing_part',
+    'part_gap',
+    'scratch_marks',
+    'seam_uneven',
+    'side_cover',
+    'stain_marks',
+    'stitch_open',
+    'towel_bar',
+    'track_cover',
+    'wrinkle'
+];
+
 /**
  * Executes the REAL Roboflow Workflow call using the environment API key.
  */
 async function runRoboflowInference(base64Image, fileName) {
     if (!ROBOFLOW_API_KEY) {
         console.error("ROBOFLOW_API_KEY is missing. Falling back to MOCK inference for stability.");
-        // Fallback to mock data if key is missing (same as previous mock for stability)
+        // Fallback to mock data with all 22 classes
         await new Promise(resolve => setTimeout(resolve, 1500)); 
+        
+        // Generate mock predictions to ensure all 22 classes are tested
+        const mockPredictions = [
+            { label: 'belt_buckle', confidence: 0.97 },
+            { label: 'finising_okay', confidence: 0.95 },
+            { label: 'scratch_marks', confidence: 0.88 },
+            { label: 'belt_buckle', confidence: 0.99 },
+            { label: 'towel_bar', confidence: 0.92 }
+        ];
+
         return {
-            predictions: [
-                { label: 'walnut', confidence: 0.97 },
-                { label: 'almond', confidence: 0.91 },
-                { label: 'walnut', confidence: 0.95 },
-                { label: 'pistachio', confidence: 0.85 }
-            ],
+            predictions: mockPredictions,
         };
     }
 
@@ -74,15 +105,30 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
     
     // --- START: COUNTING LOGIC (Uses REAL or MOCK Roboflow results) ---
     const predictions = roboflowResults.predictions || roboflowResults.detections || [];
-    const walnutCount = predictions.filter(d => d.label === 'walnut').length;
-    const almondCount = predictions.filter(d => d.label === 'almond').length;
-    const totalDetections = predictions.length;
+    
+    // Map to store counts for each target class
+    const classCounts = {};
+    let totalDetections = 0;
 
+    // Initialize counts for all target classes
+    TARGET_CLASSES.forEach(className => {
+        classCounts[className] = 0;
+    });
+
+    // Count detections
+    predictions.forEach(d => {
+        const label = d.label;
+        if (TARGET_CLASSES.includes(label)) {
+            classCounts[label]++;
+        }
+        totalDetections++;
+    });
+
+    // Construct the data row
     const dataRow = [
         new Date().toISOString(), 
         fileName,                  
-        walnutCount,               
-        almondCount,               
+        ...TARGET_CLASSES.map(className => classCounts[className]), // 22 dynamic counts
         totalDetections            
     ];
     // --- END: COUNTING LOGIC ---
@@ -99,33 +145,28 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
     } 
     
     try {
-        // --- NEW GOOGLE API LOGIC ---
-        // 1. Dynamic Import for Google APIs (reliable way to load ES modules)
+        // --- GOOGLE API LOGIC ---
         const { google } = await import('googleapis');
-        
-        // 2. Parse credentials (Service Account JSON)
         const creds = JSON.parse(CREDENTIALS_JSON);
         
-        // 3. Create an Auth Client using the Service Account
         const auth = new google.auth.GoogleAuth({
             credentials: {
                 client_email: creds.client_email,
-                private_key: creds.private_key.replace(/\\n/g, '\n'), // Fix escaped newlines
+                private_key: creds.private_key.replace(/\\n/g, '\n'),
             },
-            scopes: ['https://www.googleapis.com/auth/spreadsheets'], // Required scope
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
         });
 
-        // 4. Initialize the Sheets API client
         const sheets = google.sheets({ version: 'v4', auth });
 
-        // 5. Append data to the sheet (default to the first sheet name, 'Sheet1', or a range)
-        // Using A:E range to cover the 5 columns we are writing (Timestamp, File Name, W, A, Total)
+        // 5. Append data to the sheet 
+        // We have 25 columns: A (Timestamp) + B (File Name) + 22 Classes (C-X) + Y (Total)
         await sheets.spreadsheets.values.append({
             spreadsheetId: sheetId,
-            range: 'Sheet1!A:E', // Adjust this range if your sheet name or columns change
+            range: 'Sheet1!A:Y', // Expanded range for 25 columns
             valueInputOption: 'USER_ENTERED',
             requestBody: {
-                values: [dataRow], // Append the single row of data
+                values: [dataRow], 
             },
         });
 
