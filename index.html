@@ -40,8 +40,6 @@
             Select an image to send to the Roboflow Workflow for inference. The image will be automatically resized for reliable processing.
         </p>
         
-        <!-- The Mock Mode warning has been removed -->
-
         <!-- Image Input and Preview -->
         <div class="mb-6">
             <label for="imageUpload" class="block text-sm font-medium text-gray-700 mb-2">Upload Image</label>
@@ -71,16 +69,43 @@
         <!-- Results Display -->
         <div id="resultsDisplay" class="mt-6 p-4 border border-gray-200 rounded-lg hidden">
             <h3 class="text-lg font-semibold text-gray-800 mb-2">Inference Results</h3>
-            <div class="space-y-1 text-gray-600">
-                <p><strong>Walnuts Detected:</strong> <span id="walnutCount" class="font-bold text-blue-600">0</span></p>
-                <p><strong>Almonds Detected:</strong> <span id="almondCount" class="font-bold text-blue-600">0</span></p>
-                <p><strong>Total Items:</strong> <span id="totalCount" class="font-bold text-blue-600">0</span></p>
+            <div id="classCountsContainer" class="max-h-64 overflow-y-auto space-y-1 text-gray-600 pr-2">
+                <!-- Dynamic class counts will be inserted here by JavaScript -->
             </div>
+            <hr class="my-3 border-gray-200">
+            <p><strong>Total Items:</strong> <span id="totalCount" class="font-bold text-blue-600">0</span></p>
         </div>
 
     </div>
 
     <script>
+        // --- NOTE: These class names must EXACTLY match the names in api/process-image.js ---
+        const UI_TARGET_CLASSES = [
+            'belt_buckle',
+            'bitline_gap_available',
+            'bitline_gap_not_available',
+            'deep_hoggering',
+            'feature_line_not_okay',
+            'feature_line_okay',
+            'finising_no_okay',
+            'finising_okay',
+            'foam_visible',
+            'J_strip_lock_issue',
+            'marking_present',
+            'missing_part',
+            'no_missing_part',
+            'part_gap',
+            'scratch_marks',
+            'seam_uneven',
+            'side_cover',
+            'stain_marks',
+            'stitch_open',
+            'towel_bar',
+            'track_cover',
+            'wrinkle'
+        ];
+        // -----------------------------------------------------------------------------------
+
         const imageUpload = document.getElementById('imageUpload');
         const imagePreview = document.getElementById('imagePreview');
         const processButton = document.getElementById('processButton');
@@ -88,9 +113,26 @@
         const loadingSpinner = document.getElementById('loadingSpinner');
         const statusMessage = document.getElementById('statusMessage');
         const resultsDisplay = document.getElementById('resultsDisplay');
-        const walnutCountEl = document.getElementById('walnutCount');
-        const almondCountEl = document.getElementById('almondCount');
+        
+        const classCountsContainer = document.getElementById('classCountsContainer');
         const totalCountEl = document.getElementById('totalCount');
+        
+        // Helper function to format class names nicely for display
+        function formatClassName(name) {
+            return name.split('_')
+                       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                       .join(' ');
+        }
+
+        // Initialize the dynamic display elements
+        let classCountElements = {};
+        UI_TARGET_CLASSES.forEach(className => {
+            const p = document.createElement('p');
+            const formattedName = formatClassName(className);
+            p.innerHTML = `<strong>${formattedName} Detected:</strong> <span id="count-${className}" class="font-bold text-blue-600">0</span>`;
+            classCountsContainer.appendChild(p);
+            classCountElements[className] = p.querySelector('span');
+        });
         
         // Max width for resizing the image before sending to the server (in pixels)
         const MAX_WIDTH = 1024; 
@@ -124,11 +166,23 @@
 
         // Function to display the counts from the backend
         function displayResults(dataRow) {
-            // Data row is: [Timestamp, FileName, WalnutCount, AlmondCount, TotalCount]
-            const [, , walnutCount, almondCount, totalCount] = dataRow;
+            // Data row is: [Timestamp, FileName, ...22 Class Counts..., TotalCount]
+            
+            // The class counts start at index 2 and run for 22 elements
+            const classCountsArray = dataRow.slice(2, 2 + UI_TARGET_CLASSES.length);
+            
+            // The Total Count is the last element
+            const totalCount = dataRow[dataRow.length - 1];
 
-            walnutCountEl.textContent = walnutCount;
-            almondCountEl.textContent = almondCount;
+            // Update individual class counts
+            UI_TARGET_CLASSES.forEach((className, index) => {
+                const count = classCountsArray[index];
+                if (classCountElements[className]) {
+                    classCountElements[className].textContent = count;
+                }
+            });
+            
+            // Update total count
             totalCountEl.textContent = totalCount;
             resultsDisplay.classList.remove('hidden');
         }
@@ -187,7 +241,7 @@
 
             // 1. Prepare UI for loading
             processButton.disabled = true;
-            buttonText.textContent = 'Resizing & Processing...'; // Updated text
+            buttonText.textContent = 'Resizing & Processing...'; 
             loadingSpinner.classList.remove('hidden');
             statusMessage.classList.add('hidden');
             resultsDisplay.classList.add('hidden');
@@ -211,7 +265,7 @@
                     body: JSON.stringify({
                         image: base64Image,
                         fileName: file.name,
-                        mimeType: file.type // Sending original mimeType, but the payload is JPEG/Base64
+                        mimeType: file.type
                     })
                 });
                 
@@ -236,7 +290,6 @@
                 // SUCCESS path: Now safely parse the pre-read responseText as JSON
                 const result = JSON.parse(responseText);
                 
-                // UPDATED CLARIFICATION: Update success message to be clear about the sheet status received from the backend
                 showStatus(`Success! Image processed. Sheet update status: ${result.sheetStatus || 'Check Vercel Logs'}.`, false);
                 displayResults(result.results); // Display the counts!
 
