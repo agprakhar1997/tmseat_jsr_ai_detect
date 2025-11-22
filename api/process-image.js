@@ -108,9 +108,28 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
     
     // --- START: COUNTING LOGIC (Uses REAL or MOCK Roboflow results) ---
     
-    // CRITICAL FIX: Safely access the deeply nested 'predictions' array 
-    // that is returned by the Roboflow Workflow API
-    const predictions = roboflowResults?.[0]?.predictions?.predictions || [];
+    // CRITICAL FIX: Robustly find the predictions array from the Roboflow Workflow output.
+    // The structure can vary, so we iterate through the results array to find the detections.
+    let predictions = [];
+    
+    if (Array.isArray(roboflowResults)) {
+        console.log(`Roboflow Results Array Length: ${roboflowResults.length}`);
+        
+        // Log the full structure for debugging the zero issue
+        console.log("Roboflow Workflow Raw Response Structure (Top 2 elements):", 
+            JSON.stringify(roboflowResults.slice(0, 2), null, 2));
+
+        for (const result of roboflowResults) {
+            // Check if the current result object contains the deep predictions structure
+            if (result && result.predictions && Array.isArray(result.predictions.predictions)) {
+                predictions = result.predictions.predictions;
+                console.log(`FOUND predictions array in one of the workflow results. Length: ${predictions.length}`);
+                break; // Found the predictions, stop searching
+            }
+        }
+    } else {
+        console.error("Roboflow results is not an array. Cannot extract predictions.");
+    }
     
     console.log(`Successfully extracted ${predictions.length} detections from Roboflow response.`);
 
@@ -247,5 +266,4 @@ export default async function handler(req, res) {
             error: error.message 
         });
     }
-}    }
 }
