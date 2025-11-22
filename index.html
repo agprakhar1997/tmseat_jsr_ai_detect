@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Roboflow Workflow Processor</title>
+    <title>TMSeating Jsr CA Auditor</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -35,7 +35,14 @@
 <body class="flex items-center justify-center min-h-screen p-4">
 
     <div id="app" class="card bg-white p-8 rounded-xl w-full max-w-lg">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Roboflow Data Processor</h1>
+        <!-- TM Seating Logo (Updated URL for stability) -->
+        <img src="https://logolook.net/wp-content/uploads/2024/02/TM-Automotive-Seating-Logo.png" 
+             alt="TM Automotive Seating Systems Pvt. Ltd. Logo" 
+             class="mx-auto h-16 object-contain mb-4"
+             onerror="this.onerror=null;this.src='https://placehold.co/150x64/E0E7FF/3B82F6?text=TM+Logo+Placeholder';"
+        >
+        
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">TMSeating Jsr CA Auditor</h1>
         <p class="text-center text-sm text-gray-500 mb-2">
             Select an image to send to the Roboflow Workflow for inference. The image will be automatically resized for reliable processing.
         </p>
@@ -75,6 +82,11 @@
             <hr class="my-3 border-gray-200">
             <p><strong>Total Items:</strong> <span id="totalCount" class="font-bold text-blue-600">0</span></p>
         </div>
+        
+        <!-- Footer with Attribution -->
+        <p class="mt-6 text-xs text-center text-gray-400">
+            by T2Reality Solutions Private Limited, jsr
+        </p>
 
     </div>
 
@@ -164,28 +176,27 @@
             statusMessage.classList.remove('hidden');
         }
 
-        // Function to display the counts from the backend
-        function displayResults(dataRow) {
-            // Data row is: [Timestamp, FileName, ...22 Class Counts..., TotalCount]
+        // Function to display the counts from the backend (Object-based for robustness)
+        function displayResults(classCounts, totalCount) {
             
-            // The class counts start at index 2 and run for 22 elements
-            const classCountsArray = dataRow.slice(2, 2 + UI_TARGET_CLASSES.length);
+            console.log("--- Frontend Display Debugging ---");
+            console.log("Received Class Counts Object:", classCounts);
+            console.log("Received Total Count:", totalCount);
             
-            // The Total Count is the last element
-            const totalCount = dataRow[dataRow.length - 1];
-
             // Update individual class counts
-            UI_TARGET_CLASSES.forEach((className, index) => {
-                const count = classCountsArray[index];
+            UI_TARGET_CLASSES.forEach((className) => {
+                // Safely retrieve the count using the class name key, defaulting to 0
+                const count = classCounts[className] || 0; 
                 if (classCountElements[className]) {
-                    classCountElements[className].textContent = count;
+                    classCountElements[className].textContent = String(count);
                 }
             });
             
             // Update total count
-            totalCountEl.textContent = totalCount;
+            totalCountEl.textContent = String(totalCount);
             resultsDisplay.classList.remove('hidden');
         }
+
 
         /**
          * Resizes the image using Canvas and returns the Base64 data string.
@@ -291,7 +302,8 @@
                 const result = JSON.parse(responseText);
                 
                 showStatus(`Success! Image processed. Sheet update status: ${result.sheetStatus || 'Check Vercel Logs'}.`, false);
-                displayResults(result.results); // Display the counts!
+                // Pass the explicit classCounts object and totalCount
+                displayResults(result.classCounts, result.totalCount); 
 
             } catch (error) {
                 console.error('Processing error:', error);
