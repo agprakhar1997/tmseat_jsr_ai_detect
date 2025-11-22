@@ -133,7 +133,7 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
         totalDetections++;
     });
 
-    // Construct the data row
+    // Construct the data row (FOR GOOGLE SHEET)
     const dataRow = [
         new Date().toISOString(), 
         fileName,                  
@@ -150,7 +150,8 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
 
     if (!CREDENTIALS_JSON) {
         console.error("GOOGLE_CREDENTIALS_JSON environment variable is missing. Cannot write to real sheet.");
-        return { status: 'Failed to Authenticate (Missing Key)', row_data: dataRow };
+        // Return structured data even in failure mode so frontend can display mock counts
+        return { status: 'Failed to Authenticate (Missing Key)', row_data: dataRow, class_counts: classCounts, total_count: totalDetections };
     } 
     
     try {
@@ -192,7 +193,13 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
         }
     }
     
-    return { status: sheetStatus, row_data: dataRow };
+    // CRITICAL: Return the counts explicitly as an object for robust frontend display
+    return { 
+        status: sheetStatus, 
+        row_data: dataRow, 
+        class_counts: classCounts, 
+        total_count: totalDetections 
+    };
 }
 
 
@@ -224,10 +231,13 @@ export default async function handler(req, res) {
         );
 
         // 3. Send success response back to the client
+        // Sending the new structured data for robust frontend parsing
         return res.status(200).json({
             message: "Image processed. Sheet update logic executed.",
             sheetStatus: sheetResponse.status,
-            results: sheetResponse.row_data 
+            results: sheetResponse.row_data, // Kept for debugging/backward compatibility
+            classCounts: sheetResponse.class_counts,
+            totalCount: sheetResponse.total_count
         });
 
     } catch (error) {
@@ -237,4 +247,5 @@ export default async function handler(req, res) {
             error: error.message 
         });
     }
+}    }
 }
