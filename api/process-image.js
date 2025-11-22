@@ -3,9 +3,8 @@
 // structure for Google Sheets integration.
 
 // --- EXTERNAL DEPENDENCY REQUIRED FOR GOOGLE SHEETS ---
-// FIX: Using 'import * as' ensures we capture the GoogleSpreadsheet class correctly 
-// in Vercel's ES Module environment.
-import * as GoogleSheets from 'google-spreadsheet';
+// Removed static import (import * as GoogleSheets from 'google-spreadsheet';)
+// We will use dynamic import within the function for reliable loading.
 
 // --- CONSTANTS & CONFIGURATION ---
 const ROBOFLOW_API_KEY = process.env.ROBOFLOW_API_KEY; 
@@ -103,21 +102,21 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
     } 
     
     try {
-        // 1. Parse credentials and setup:
+        // --- FINAL FIX APPLIED HERE ---
+        // 1. Use Dynamic Import to reliably load the GoogleSpreadsheet class
+        const { GoogleSpreadsheet } = await import('google-spreadsheet');
+        
+        // 2. Parse credentials and setup:
         const creds = JSON.parse(CREDENTIALS_JSON);
+        const doc = new GoogleSpreadsheet(sheetId); // Use the correctly loaded class
         
-        // --- FIX APPLIED HERE ---
-        // Robustly get the constructor. This handles the case where the class is incorrectly 
-        // nested under the 'default' property in some ES module environments.
-        const GoogleSpreadsheetClass = GoogleSheets.GoogleSpreadsheet || GoogleSheets.default;
-        const doc = new GoogleSpreadsheetClass(sheetId); 
-        
-        // 2. Authenticate:
-        await doc.useServiceAccountAuth(creds);
+        // 3. Authenticate:
+        // This is the function that was failing, but should now be available:
+        await doc.useServiceAccountAuth(creds); 
         await doc.loadInfo(); // Loads document properties and worksheets
         const sheet = doc.sheetsByIndex[0]; 
 
-        // 3. Write data:
+        // 4. Write data:
         // NOTE: Column headers MUST match the sheet headers exactly (Timestamp, File Name, Walnut Count, etc.)
         await sheet.addRow({
             'Timestamp': dataRow[0],
@@ -131,8 +130,9 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
 
     } catch (error) {
         console.error('GOOGLE SHEETS API ERROR:', error.message);
-        // This usually indicates an issue with the Service Account email not having 'Editor' access
-        sheetStatus = `Failed to Write: ${error.message.substring(0, 50)}...`;
+        // This usually indicates an issue with the Service Account email not having 'Editor' access,
+        // which will now be the next likely error if the class loading is fixed.
+        sheetStatus = `Failed to Write: ${error.message.substring(0, 50)}... (Check permissions/headers)`;
     }
     
     return { status: sheetStatus, row_data: dataRow };
