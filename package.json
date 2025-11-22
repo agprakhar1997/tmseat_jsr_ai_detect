@@ -2,6 +2,9 @@
   "name": "roboflow-vercel-processor",
   "version": "1.0.0",
   "type": "module",
+  "dependencies": {
+    "google-spreadsheet": "^4.1.0"
+  },
   "serverless": {
     "maxDuration": 30,
     "bodySizeLimit": "50mb"
