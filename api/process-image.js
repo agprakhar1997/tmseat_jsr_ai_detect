@@ -2,6 +2,9 @@
 // It is configured for REAL Roboflow inference and contains the secure 
 // structure for Google Sheets integration.
 
+// --- EXTERNAL DEPENDENCY REQUIRED FOR GOOGLE SHEETS ---
+import { GoogleSpreadsheet } from 'google-spreadsheet';
+
 // --- CONSTANTS & CONFIGURATION ---
 const ROBOFLOW_API_KEY = process.env.ROBOFLOW_API_KEY; 
 const GOOGLE_SHEET_ID = '1-nYFSaufidji9l3OKfYeiyumQbGdmh5waFBbXapxMKc'; 
@@ -65,11 +68,10 @@ async function runRoboflowInference(base64Image, fileName) {
 }
 
 /**
- * [REAL LOGIC STRUCTURE] Securely prepares the data for Google Sheet append.
- * NOTE: The actual writing is commented out as it requires an external library.
+ * [REAL LOGIC STRUCTURE] Securely prepares the data and appends it to the Google Sheet.
  */
 async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
-    console.log(`SHEET LOGIC: Preparing data for append to ID: ${sheetId}`);
+    console.log(`SHEET LOGIC: Attempting to write data to ID: ${sheetId}`);
     
     // --- START: COUNTING LOGIC (Uses REAL or MOCK Roboflow results) ---
     const predictions = roboflowResults.predictions || roboflowResults.detections || [];
@@ -87,46 +89,40 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
     // --- END: COUNTING LOGIC ---
 
     // =========================================================================
-    // !!! CRITICAL: GOOGLE SHEETS API IMPLEMENTATION (Conceptual) !!!
+    // !!! CRITICAL: GOOGLE SHEETS API IMPLEMENTATION (ACTIVATED) !!!
     // =========================================================================
 
-    let sheetStatus = 'Success (Simulated Write)';
+    let sheetStatus = 'Write Failed: Unknown Error';
 
     if (!CREDENTIALS_JSON) {
         console.error("GOOGLE_CREDENTIALS_JSON environment variable is missing. Cannot write to real sheet.");
-        sheetStatus = 'Failed to Authenticate (Missing Key)';
-    } else {
-        // --- REAL GOOGLE SHEETS INTEGRATION CODE (Requires 'google-spreadsheet' npm package) ---
-        /*
-        // 1. Import and setup in a real deployment:
-        // const { GoogleSpreadsheet } = require('google-spreadsheet');
+        return { status: 'Failed to Authenticate (Missing Key)', row_data: dataRow };
+    } 
+    
+    try {
+        // 1. Parse credentials and setup:
+        const creds = JSON.parse(CREDENTIALS_JSON);
+        const doc = new GoogleSpreadsheet(sheetId); 
         
-        try {
-            // const creds = JSON.parse(CREDENTIALS_JSON);
-            // const doc = new GoogleSpreadsheet(sheetId); 
-            
-            // 2. Authenticate:
-            // await doc.useServiceAccountAuth(creds);
-            // await doc.loadInfo(); 
-            // const sheet = doc.sheetsByIndex[0]; 
+        // 2. Authenticate:
+        await doc.useServiceAccountAuth(creds);
+        await doc.loadInfo(); // Loads document properties and worksheets
+        const sheet = doc.sheetsByIndex[0]; 
 
-            // 3. Write data:
-            // await sheet.addRow({
-            //     'Timestamp': dataRow[0],
-            //     'File Name': dataRow[1],
-            //     'Walnut Count': dataRow[2],
-            //     'Almond Count': dataRow[3],
-            //     'Total Detected': dataRow[4]
-            // });
+        // 3. Write data:
+        await sheet.addRow({
+            'Timestamp': dataRow[0],
+            'File Name': dataRow[1],
+            'Walnut Count': dataRow[2],
+            'Almond Count': dataRow[3],
+            'Total Detected': dataRow[4]
+        });
 
-            // sheetStatus = 'Success (Wrote to Sheet)';
+        sheetStatus = 'Success (Wrote to Sheet)';
 
-        } catch (error) {
-            // console.error('GOOGLE SHEETS API ERROR:', error.message);
-            // sheetStatus = `Failed to Write: ${error.message.substring(0, 50)}...`;
-        }
-        */
-        console.log("SHEET WRITE SIMULATED SUCCESSFULLY. (Real integration structure validated).");
+    } catch (error) {
+        console.error('GOOGLE SHEETS API ERROR:', error.message);
+        sheetStatus = `Failed to Write: ${error.message.substring(0, 50)}...`;
     }
     
     return { status: sheetStatus, row_data: dataRow };
@@ -140,7 +136,7 @@ export default async function handler(req, res) {
         return res.status(405).json({ message: `Method ${req.method} not allowed` });
     }
 
-    console.warn("VERCEL LOG: Running in REAL Roboflow mode (if API Key is set) and REAL Sheet structure mode.");
+    console.warn("VERCEL LOG: Running in REAL Roboflow mode and REAL Sheet write mode.");
 
     try {
         const { image: base64Image, fileName } = req.body;
@@ -152,7 +148,7 @@ export default async function handler(req, res) {
         // 1. Run Roboflow Inference (REAL)
         const roboflowResults = await runRoboflowInference(base64Image, fileName);
         
-        // 2. Append Data to Google Sheet (REAL STRUCTURE)
+        // 2. Append Data to Google Sheet (REAL)
         const sheetResponse = await appendDataToGoogleSheet(
             GOOGLE_SHEET_ID, 
             roboflowResults, 
@@ -173,5 +169,4 @@ export default async function handler(req, res) {
             error: error.message 
         });
     }
-}
 }
