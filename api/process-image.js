@@ -1,10 +1,6 @@
 // This file is the secure backend handler that runs on Vercel.
 // It is configured for REAL Roboflow inference and contains the secure 
-// structure for Google Sheets integration.
-
-// --- EXTERNAL DEPENDENCY REQUIRED FOR GOOGLE SHEETS ---
-// Removed static import (import * as GoogleSheets from 'google-spreadsheet';)
-// We will use dynamic import within the function for reliable loading.
+// structure for Google Sheets integration using the official 'googleapis'.
 
 // --- CONSTANTS & CONFIGURATION ---
 const ROBOFLOW_API_KEY = process.env.ROBOFLOW_API_KEY; 
@@ -70,7 +66,8 @@ async function runRoboflowInference(base64Image, fileName) {
 }
 
 /**
- * [REAL LOGIC STRUCTURE] Securely prepares the data and appends it to the Google Sheet.
+ * [REAL LOGIC STRUCTURE] Securely prepares the data and appends it to the Google Sheet 
+ * using the official Google API library.
  */
 async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
     console.log(`SHEET LOGIC: Attempting to write data to ID: ${sheetId}`);
@@ -102,37 +99,47 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
     } 
     
     try {
-        // --- FINAL FIX APPLIED HERE ---
-        // 1. Use Dynamic Import to reliably load the GoogleSpreadsheet class
-        const { GoogleSpreadsheet } = await import('google-spreadsheet');
+        // --- NEW GOOGLE API LOGIC ---
+        // 1. Dynamic Import for Google APIs (reliable way to load ES modules)
+        const { google } = await import('googleapis');
         
-        // 2. Parse credentials and setup:
+        // 2. Parse credentials (Service Account JSON)
         const creds = JSON.parse(CREDENTIALS_JSON);
-        const doc = new GoogleSpreadsheet(sheetId); // Use the correctly loaded class
         
-        // 3. Authenticate:
-        // This is the function that was failing, but should now be available:
-        await doc.useServiceAccountAuth(creds); 
-        await doc.loadInfo(); // Loads document properties and worksheets
-        const sheet = doc.sheetsByIndex[0]; 
-
-        // 4. Write data:
-        // NOTE: Column headers MUST match the sheet headers exactly (Timestamp, File Name, Walnut Count, etc.)
-        await sheet.addRow({
-            'Timestamp': dataRow[0],
-            'File Name': dataRow[1],
-            'Walnut Count': dataRow[2],
-            'Almond Count': dataRow[3],
-            'Total Detected': dataRow[4]
+        // 3. Create an Auth Client using the Service Account
+        const auth = new google.auth.GoogleAuth({
+            credentials: {
+                client_email: creds.client_email,
+                private_key: creds.private_key.replace(/\\n/g, '\n'), // Fix escaped newlines
+            },
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'], // Required scope
         });
 
-        sheetStatus = 'Success (Wrote to Sheet)';
+        // 4. Initialize the Sheets API client
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        // 5. Append data to the sheet (default to the first sheet name, 'Sheet1', or a range)
+        // Using A:E range to cover the 5 columns we are writing (Timestamp, File Name, W, A, Total)
+        await sheets.spreadsheets.values.append({
+            spreadsheetId: sheetId,
+            range: 'Sheet1!A:E', // Adjust this range if your sheet name or columns change
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+                values: [dataRow], // Append the single row of data
+            },
+        });
+
+        sheetStatus = 'Success (Wrote to Sheet via Google API)';
 
     } catch (error) {
         console.error('GOOGLE SHEETS API ERROR:', error.message);
-        // This usually indicates an issue with the Service Account email not having 'Editor' access,
-        // which will now be the next likely error if the class loading is fixed.
-        sheetStatus = `Failed to Write: ${error.message.substring(0, 50)}... (Check permissions/headers)`;
+        
+        // Check for common permission issues
+        if (error.code === 400 || error.code === 403) {
+            sheetStatus = `Failed to Write: Permission or Range error. Check if Service Account email has Editor access and if Sheet1 exists.`;
+        } else {
+            sheetStatus = `Failed to Write: ${error.message.substring(0, 50)}... (API Failure)`;
+        }
     }
     
     return { status: sheetStatus, row_data: dataRow };
