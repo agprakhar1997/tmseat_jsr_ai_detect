@@ -4,7 +4,7 @@
 
 // --- EXTERNAL DEPENDENCY REQUIRED FOR GOOGLE SHEETS ---
 // FIX: Using 'import * as' ensures we capture the GoogleSpreadsheet class correctly 
-// in Vercel's ES Module environment, resolving the 'not a function' error.
+// in Vercel's ES Module environment.
 import * as GoogleSheets from 'google-spreadsheet';
 
 // --- CONSTANTS & CONFIGURATION ---
@@ -105,8 +105,12 @@ async function appendDataToGoogleSheet(sheetId, roboflowResults, fileName) {
     try {
         // 1. Parse credentials and setup:
         const creds = JSON.parse(CREDENTIALS_JSON);
-        // Using the correctly imported class from the GoogleSheets module
-        const doc = new GoogleSheets.GoogleSpreadsheet(sheetId); 
+        
+        // --- FIX APPLIED HERE ---
+        // Robustly get the constructor. This handles the case where the class is incorrectly 
+        // nested under the 'default' property in some ES module environments.
+        const GoogleSpreadsheetClass = GoogleSheets.GoogleSpreadsheet || GoogleSheets.default;
+        const doc = new GoogleSpreadsheetClass(sheetId); 
         
         // 2. Authenticate:
         await doc.useServiceAccountAuth(creds);
