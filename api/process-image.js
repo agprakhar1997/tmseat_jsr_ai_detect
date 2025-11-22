@@ -91,6 +91,13 @@ async function runRoboflowInference(base64Image, fileName) {
         // Roboflow workflow returns the results nested within an array
         if (!Array.isArray(data) || data.length === 0) {
             console.warn("Roboflow response successful but is not in the expected workflow array format.", data);
+            
+            // CRITICAL FIX: If response is OK (200) but not an array, it's likely an error object
+            if (response.ok) {
+                console.error("CRITICAL: Roboflow returned a 200 OK status, but the response body was NOT a JSON array. Assuming error object and logging raw body:", data);
+                // Throw an explicit error to prevent non-array data from being passed downstream
+                throw new Error(`Roboflow returned an unexpected non-array response structure after successful API call. Please check Vercel logs for the raw response body. Raw data snippet: ${JSON.stringify(data).substring(0, 100)}...`);
+            }
         }
         
         return data; // Return the full API response array
